@@ -1,0 +1,7 @@
+{
+  "name": "CrowdCounterApp",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
