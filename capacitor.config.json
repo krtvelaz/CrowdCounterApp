@@ -1,0 +1,8 @@
+{
+    "server": {
+        "hostname": "192.168.0.41:5000",
+        "iosScheme": "https",
+        "androidScheme": "https",
+        "url": "https://192.168.0.41:5000"
+    }
+}

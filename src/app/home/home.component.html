@@ -1,13 +1,17 @@
 <ion-header>
   <ion-toolbar>
     <ion-title>
-      Camera App
+      CrowdCounterApp
     </ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
   <ion-card>
+    <ion-card-header>
+      <ion-card-title>Conteo de Personas</ion-card-title>
+      <ion-card-subtitle>Evento #{{eventId}} - Camara # {{cameraId}}</ion-card-subtitle>
+    </ion-card-header>
     <video autoplay="true" #videocapturing></video>
     <canvas class="hidden" #canvacapturing></canvas>
     <ion-card-content>
@@ -17,10 +21,12 @@
       </ion-item>
       <ion-button expand="full" (click)="startCapture()" [disabled]="isCapturing">Iniciar Captura</ion-button>
       <ion-button expand="full" (click)="stopCapture()" [disabled]="!isCapturing">Detener Captura</ion-button>
+      <ion-button expand="full" (click)="syncError()">Sincronizar Capturas con error</ion-button>
     </ion-card-content>
     <ion-card-content *ngIf="isCapturing">
       <p>Capturando ....</p>
       <p>Fotos tomadas: {{ photoCount }}</p>
+      <p>Fotos almacenadas por error de envío: {{ photoCount }}</p>
       <img [src]="imageElementSrc" alt="" width="100" height="100">
     </ion-card-content>
   </ion-card>
