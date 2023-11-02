@@ -89,7 +89,14 @@ export class HomeComponent implements OnInit {
     const fechaEnFormatoDeseado = `${año}${mes}${dia}_${hora}${minutos}${segundos}`;
     return fechaEnFormatoDeseado;
   }
-
+  async updatePendingSync(){
+    const files = await Filesystem.readdir({
+      path: `${DIRECTORY_IMAGES}/`,
+      directory: APP_DIRECTORY
+    });
+    this.pendingImages = files.files.length;
+    return files;
+  }
   initializeStorage(path: string): Promise<boolean> {
     return Filesystem.readdir({
       path: path,
@@ -126,6 +133,7 @@ export class HomeComponent implements OnInit {
   stopCapture() {
     this.isCapturing = false;
     clearInterval(this.captureIntervalId);
+    this.updatePendingSync();
   }
 
   async takePhotoBrowser() {
@@ -181,12 +189,7 @@ export class HomeComponent implements OnInit {
  
   async syncError() {
     this.isSyncing = true;
-    const files = await Filesystem.readdir({
-      path: `${DIRECTORY_IMAGES}/`,
-      directory: APP_DIRECTORY
-    });
-    this.pendingImages = files.files.length;
-  
+    const files =await this.updatePendingSync();
     for (let file of files.files) {
       try {
         const fileData:any = await Filesystem.readFile({
