@@ -1,8 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.crowdcounter.app',
-  appName: 'CrowdCounterApp',
+  appId: 'com.insite.app',
+  appName: 'InSiteApp',
   webDir: 'www',
   server: {
     androidScheme: 'https'
