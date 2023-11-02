@@ -6,6 +6,7 @@ import { AlertController, ToastController } from '@ionic/angular';
 import write_blob from 'capacitor-blob-writer';
 
 const APP_DIRECTORY = Directory.Documents;
+const DIRECTORY_IMAGES = '/insiteapp/images';
 
 @Component({
   selector: 'app-home',
@@ -47,7 +48,7 @@ export class HomeComponent implements OnInit {
           console.log("Error al obtener el stream de la cámara: ", error);
         });
     }
-    if (!this.initializeStorage('/insiteapp/images')) {
+    if (!this.initializeStorage(DIRECTORY_IMAGES)) {
       this.alertController.create({
         header: 'Error',
         message: 'No se pudo crear el directorio de almacenamiento',
@@ -168,7 +169,7 @@ export class HomeComponent implements OnInit {
     } catch (error) {
       await write_blob({
         directory: APP_DIRECTORY,
-        path: `/insiteapp/images/${namePhoto}`,
+        path: `${DIRECTORY_IMAGES}/${namePhoto}`,
         blob: photoBlob,
         on_fallback(error: any) {
           console.log("🚀 ~ file: home.component.ts:171 ~ HomeComponent ~ sendImages ~ error:", error);
@@ -181,7 +182,7 @@ export class HomeComponent implements OnInit {
   async syncError() {
     this.isSyncing = true;
     const files = await Filesystem.readdir({
-      path: '/insiteapp/images/',
+      path: `${DIRECTORY_IMAGES}/`,
       directory: APP_DIRECTORY
     });
     this.pendingImages = files.files.length;
@@ -189,7 +190,7 @@ export class HomeComponent implements OnInit {
     for (let file of files.files) {
       try {
         const fileData:any = await Filesystem.readFile({
-          path: `/insiteapp/images/${file.name}`,
+          path: `${DIRECTORY_IMAGES}/${file.name}`,
           directory: APP_DIRECTORY,
         });
         const rawData = atob(fileData.data);
@@ -210,7 +211,7 @@ export class HomeComponent implements OnInit {
   
         if (response.status === 201) {
           await Filesystem.deleteFile({
-            path: `/insiteapp/images/${file.name}`,
+            path: `${DIRECTORY_IMAGES}/${file.name}`,
             directory: APP_DIRECTORY
           });
           this.pendingImages--;
