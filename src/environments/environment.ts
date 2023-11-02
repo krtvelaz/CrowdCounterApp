@@ -3,7 +3,9 @@
 // The list of file replacements can be found in `angular.json`.
 
 export const environment = {
-  production: false
+  production: false,
+  tokenAuth:'zTa5RzNLKQQDp8XBMdKu2Vu7Xp3dDYuP',
+  apiUrl: 'https://insite.dation.co/',
 };
 
 /*

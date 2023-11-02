@@ -1,42 +1,81 @@
-<ion-header>
-  <ion-toolbar>
-    <ion-title>
-      CrowdCounterApp
-    </ion-title>
-  </ion-toolbar>
-</ion-header>
+<ion-menu contentId="main-content">
+  <ion-header>
+    <ion-toolbar>
+      <ion-title>Configuracion</ion-title>
+    </ion-toolbar>
+  </ion-header>
+  <ion-content class="ion-padding">
+    <ion-item>
+      <ion-label position="stacked">Id Evento</ion-label>
+      <ion-input type="number" [(ngModel)]="eventId"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-label position="stacked">Id Camara</ion-label>
+      <ion-input type="number" [(ngModel)]="cameraId"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-label position="stacked">Frecuencia de captura (s)</ion-label>
+      <ion-input type="number" [(ngModel)]="captureInterval"></ion-input>
+    </ion-item>
+  </ion-content>
+</ion-menu>
+<div class="ion-page" id="main-content">
+  <ion-header>
+    <ion-toolbar>
+      <ion-buttons slot="end">
+        <ion-menu-button><ion-icon name="cog-outline"></ion-icon></ion-menu-button>
+      </ion-buttons>
+      <ion-title>
+        InSite App
+      </ion-title>
+    </ion-toolbar>
+  </ion-header>
 
-<ion-content>
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Conteo de Personas</ion-card-title>
-      <ion-card-subtitle>Evento #{{eventId}} - Camara # {{cameraId}}</ion-card-subtitle>
-    </ion-card-header>
-    <video autoplay="true" #videocapturing></video>
-    <canvas class="hidden" #canvacapturing></canvas>
-    <ion-card-content>
-      <ion-item>
-        <ion-label position="stacked">Frecuencia de captura (segundos)</ion-label>
-        <ion-input type="number" [(ngModel)]="captureInterval"></ion-input>
-      </ion-item>
-      <ion-button expand="full" (click)="startCapture()" [disabled]="isCapturing">Iniciar Captura</ion-button>
-      <ion-button expand="full" (click)="stopCapture()" [disabled]="!isCapturing">Detener Captura</ion-button>
-      <ion-button expand="full" (click)="syncError()">Sincronizar Capturas con error</ion-button>
-    </ion-card-content>
-    <ion-card-content *ngIf="isCapturing">
-      <p>Capturando ....</p>
-      <p>Fotos tomadas: {{ photoCount }}</p>
-      <p>Fotos almacenadas por error de envío: {{ photoCount }}</p>
-      <img [src]="imageElementSrc" alt="" width="100" height="100">
-    </ion-card-content>
-  </ion-card>
+  <ion-content>
+    <ion-progress-bar type="indeterminate" *ngIf="isCapturing" color="success"></ion-progress-bar>
+    <ion-card>
+      <ion-card-header>
+        <ion-item>
+          <div>
+            <ion-card-title>Conteo de Personas</ion-card-title>
+          <ion-card-subtitle>Evento #{{eventId}} - Cámara # {{cameraId}}</ion-card-subtitle>
+          </div>
+          <ion-button slot="end" (click)="toggleCamera()" [disabled]="isCapturing">
+            <ion-icon slot="end" name="sync-outline"></ion-icon>
+            Cámara
+          </ion-button>
+        </ion-item>
+      </ion-card-header>
+      <ion-card-content *ngIf="isCapturing">
+        <ion-item>
+          <ion-label class="ion-text-wrap">
+          Capturando <br>
+          Fotos tomadas: {{ photoCount }} <br>
+          Fotos almacenadas por error de envío: {{ photoErrorCount }} <br>
+        </ion-label>
+          <ion-spinner slot="end" color="success" name="circular"></ion-spinner>
+        </ion-item>
+        <img [src]="imageElementSrc" alt="" width="100" >
+      </ion-card-content>
+      <ion-card-content>
+        <ion-button *ngIf="!isCapturing" (click)="startCapture()" [disabled]="isCapturing">Iniciar Captura</ion-button>
+        <ion-button *ngIf="isCapturing" (click)="stopCapture()" [disabled]="!isCapturing">Detener Captura</ion-button>
+        <ion-button (click)="syncError()">
+          Sincronizar {{pendingImages>0?'('+pendingImages+')':''}} <br>
+          <ion-spinner *ngIf="isSyncing" slot="end" name="circular"></ion-spinner>
+        </ion-button>
+        <video autoplay="true" #videocapturing></video>
+        <canvas class="hidden" #canvacapturing></canvas>
+      </ion-card-content>
+    </ion-card>
 
-  <ion-card *ngIf="!isCapturing && photoCount > 0">
-    <ion-card-header>
-      <ion-card-title>Última Foto Capturada:</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <img [src]="imageElementSrc" #imageElement/>
-    </ion-card-content>
-  </ion-card>
-</ion-content>
+    <ion-card *ngIf="!isCapturing && photoCount > 0">
+      <ion-card-header>
+        <ion-card-title>Última Foto Capturada:</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <img [src]="imageElementSrc" #imageElement width="200" />
+      </ion-card-content>
+    </ion-card>
+  </ion-content>
+</div>

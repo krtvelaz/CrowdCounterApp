@@ -1,6 +1,11 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { environment } from 'src/environments/environment';
+import { AlertController, ToastController } from '@ionic/angular';
+import write_blob from 'capacitor-blob-writer';
+
+const APP_DIRECTORY = Directory.Documents;
 
 @Component({
   selector: 'app-home',
@@ -14,35 +19,109 @@ export class HomeComponent implements OnInit {
   imageBlob: any;
   captureInterval: number = 5;
   isCapturing: boolean = false;
+  isSyncing: boolean = false;
   photoCount: number = 0;
   photoErrorCount: number = 0;
+  pendingImages: number = 0;
   captureIntervalId: any;
   eventId: number = 1;
   cameraId: number = 1;
-  constructor() { }
+  tokenAuth: string;
+  apiUrl: string;
+
+  constructor(
+    private alertController: AlertController,
+    private toastController: ToastController
+  ) {
+    this.tokenAuth = environment.tokenAuth;
+    this.apiUrl = environment.apiUrl;
+  }
 
   ngOnInit() {
     if (navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ video: true, audio: false })
         .then((stream) => {
           this.videocapturing.nativeElement.srcObject = stream;
-          console.log("🚀 ~ file: home.component.ts:23 ~ HomeComponent ~ .then ~ stream: capturando")
         })
         .catch((error) => {
           console.log("Error al obtener el stream de la cámara: ", error);
         });
     }
+    if (!this.initializeStorage('/insiteapp/images')) {
+      this.alertController.create({
+        header: 'Error',
+        message: 'No se pudo crear el directorio de almacenamiento',
+        buttons: ['OK']
+      }).then(alert => alert.present());
+    }
   }
 
-  startCapture() {
-    this.isCapturing = true;
-    this.photoCount = 0;
-
-    this.captureIntervalId = setInterval(() => {
-      this.takePhotoBrowser();
-    }, this.captureInterval * 1000);
+  toggleCamera() {
+    navigator.mediaDevices.enumerateDevices()
+      .then(devices => {
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        const currentCamera = this.videocapturing.nativeElement.srcObject.getTracks()[0];
+        const currentIndex = videoDevices.findIndex(device => device.deviceId === currentCamera.getSettings().deviceId);
+        const nextIndex = (currentIndex + 1) % videoDevices.length;
+        const nextCamera = videoDevices[nextIndex];
+        currentCamera.stop();
+        navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: nextCamera.deviceId } }, audio: false })
+          .then((stream) => {
+            this.videocapturing.nativeElement.srcObject = stream;
+          })
+          .catch((error) => {
+            console.log("Error al cambiar la cámara: ", error);
+          });
+      })
+      .catch(error => {
+        console.log("Error al enumerar dispositivos: ", error);
+      });
+  }
+  getFormatingDate() {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    const hora = String(fecha.getHours()).padStart(2, '0');
+    const minutos = String(fecha.getMinutes()).padStart(2, '0');
+    const segundos = String(fecha.getSeconds()).padStart(2, '0')
+    const fechaEnFormatoDeseado = `${año}${mes}${dia}_${hora}${minutos}${segundos}`;
+    return fechaEnFormatoDeseado;
   }
 
+  initializeStorage(path: string): Promise<boolean> {
+    return Filesystem.readdir({
+      path: path,
+      directory: APP_DIRECTORY
+    }).then(_ => {
+      return true;
+    }).catch(_ => {
+      return Filesystem.mkdir({
+        path: path,
+        directory: APP_DIRECTORY,
+        recursive: true
+      }).then(_ => {
+        return true;
+      });
+    });
+  }
+  async startCapture() {
+    try {
+      this.isCapturing = true;
+      this.photoCount = 0;
+      this.captureIntervalId = setInterval(() => {
+        this.takePhotoBrowser();
+      }, this.captureInterval * 1000);
+    } catch (error) {
+      console.log("🚀 ~ file: home.component.ts:104 ~ HomeComponent ~ startCapture ~ error:", error)
+      this.alertController.create({
+        header: 'Error',
+        message: 'No se pudo iniciar la captura de imágenes',
+        buttons: ['OK']
+      }).then(alert => alert.present());
+    }
+
+  }
   stopCapture() {
     this.isCapturing = false;
     clearInterval(this.captureIntervalId);
@@ -56,91 +135,94 @@ export class HomeComponent implements OnInit {
     this.canvacapturing.nativeElement.width = width;
     this.canvacapturing.nativeElement.height = height;
     context.drawImage(this.videocapturing.nativeElement, 0, 0, width, height);
-    this.canvacapturing.nativeElement.toBlob(async (blob: any) => {
-      this.imageBlob = blob;
-      const imageUrl = URL.createObjectURL(blob);
-      this.imageElementSrc = imageUrl;
-      this.photoCount++;
-    }, 'image/png', 1);
-    // this.sendImages();
-  }
-  async takePhotoCapacitor() {
 
-    const image = await Camera.getPhoto({
-      quality: 90,
-      allowEditing: false,
-      resultType: CameraResultType.Uri,
-      source: CameraSource.Camera,
-    });
-    let imageUrl = image.webPath;
-    this.imageElementSrc = imageUrl ?? '';
-    this.photoCount++;
+    const photoBlob:Blob = await new Promise(resolve=>this.canvacapturing.nativeElement.toBlob(resolve,'image/png', 1));
+    this.imageElementSrc=URL.createObjectURL(photoBlob);
+    this.imageBlob=photoBlob;
+    this.sendImages(photoBlob);
   }
 
-  async sendImages() {
-    //envia la imagen a la url de la api con la fecha de captura y el id de la camara, si la respuesta no es 200, guarda la imagen en el dispositivo con el nombre {camaraid}-{evento}-{fechacaptura}.png
-    const eventId = this.eventId;
-    const cameraId = this.cameraId;
-    const date = new Date();
-    const dateFormatted = `${date.getDate()}${date.getMonth()}${date.getFullYear()}${date.getHours()}${date.getMinutes()}${date.getSeconds()}`;
+  async sendImages(photoBlob:Blob) {
+    const dateFormatted = this.getFormatingDate();
+    const namePhoto = `${this.eventId}_${this.cameraId}_${dateFormatted}.png`;
+    //send imagefile to api
+    const formData = new FormData();
+    formData.append('image', photoBlob, namePhoto);
+    formData.append('token', this.tokenAuth);
+    formData.append('eventId', this.eventId.toString());
+    formData.append('cameraId', this.cameraId.toString());
+    
     try {
-      const apiUrl = 'http://localhost:3000/getFoto.php?token=123456789';
-      //send imagefile to api
-      const formData = new FormData();
-      formData.append('image', this.imageBlob, `crowdcounter-${cameraId}-${eventId}-${dateFormatted}.png`);
-
-      const response = await fetch(`${apiUrl}&eventId=${eventId}&cameraId=${cameraId}&date=${dateFormatted}`
+      const response = await fetch(`${this.apiUrl}saveimg.php`
         , {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            // 'Content-Type': 'multipart/form-data'
           },
           body: formData
         });
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        this.photoCount++;
     } catch (error) {
-      const result = await Filesystem.writeFile({
-        path: `imagesCrowdCounter/crowdcounter-${cameraId}-${eventId}-${dateFormatted}.png`,
-        data: this.imageBlob,
-        directory: Directory.Data,
-        encoding: Encoding.UTF8
+      await write_blob({
+        directory: APP_DIRECTORY,
+        path: `/insiteapp/images/${namePhoto}`,
+        blob: photoBlob,
+        on_fallback(error: any) {
+          console.log("🚀 ~ file: home.component.ts:171 ~ HomeComponent ~ sendImages ~ error:", error);
+        }
       });
       this.photoErrorCount++;
-
     }
   }
+ 
   async syncError() {
-    //leer los archivos guardados en el dispositivo y enviarlos a la api
-    // const files = await Filesystem.readdir({
-    //   path: 'imagesCrowdCounter',
-    //   directory: Directory.Data
-    // });
-    // const apiUrl = 'http://localhost:3000/getFoto.php?token=123456789';
-    // for (const file of files.files) {
-    //   const fileData: any = await Filesystem.readFile({
-    //     path: `imagesCrowdCounter/${file}`,
-    //     directory: Directory.Data,
-    //     encoding: Encoding.UTF8
-    //   });
-    //   const date = new Date();
-    //   const dateFormatted = file.name.split('-')[3].split('.')[0];
-    //   const cameraId = file.name.split('-')[1];
-    //   const eventId = file.name.split('-')[2];
-    //   const formData = new FormData();
-    //   formData.append('image', fileData, file.name);
-    //   const response = await fetch(`${apiUrl}&eventId=${eventId}&cameraId=${cameraId}&date=${dateFormatted}`
-    //     , {
-    //       method: 'POST',
-    //       headers: {
-    //         'Content-Type': 'application/json'
-    //       },
-    //       body: formData
-    //     });
-    //   if (response.status === 200) {
-    //     await Filesystem.deleteFile({
-    //       path: `imagesCrowdCounter/${file}`,
-    //       directory: Directory.Data
-    //     });
-    //   }
-    // }
+    this.isSyncing = true;
+    const files = await Filesystem.readdir({
+      path: '/insiteapp/images/',
+      directory: APP_DIRECTORY
+    });
+    this.pendingImages = files.files.length;
+  
+    for (let file of files.files) {
+      try {
+        const fileData:any = await Filesystem.readFile({
+          path: `/insiteapp/images/${file.name}`,
+          directory: APP_DIRECTORY,
+        });
+        const rawData = atob(fileData.data);
+        const blob = new Blob([rawData], { type: 'image/png' });
+  
+        const eventId = file.name.split('_')[0];
+        const cameraId = file.name.split('_')[1];
+        const formData = new FormData();
+        formData.append('image', blob, file.name);
+        formData.append('token', this.tokenAuth);
+        formData.append('eventId', eventId);
+        formData.append('cameraId', cameraId);
+  
+        const response = await fetch(`${this.apiUrl}saveimg.php`, {
+          method: 'POST',
+          body: formData
+        });
+  
+        if (response.status === 201) {
+          await Filesystem.deleteFile({
+            path: `/insiteapp/images/${file.name}`,
+            directory: APP_DIRECTORY
+          });
+          this.pendingImages--;
+        } else {
+          console.error(`Failed to upload ${file.name}. Status: ${response.status}`);
+        }
+      } catch (error) {
+        console.error(`Error processing ${file.name}: ${error}`);
+      }
+    }
+  
+    this.isSyncing = false;
   }
+  
 }
